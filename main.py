@@ -1,4 +1,4 @@
-from flask import Flask, render_template, redirect, url_for, request
+from flask import Flask, render_template, redirect, url_for, request, flash
 from flask_bootstrap import Bootstrap
 from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import FlaskForm
@@ -9,6 +9,12 @@ import smtplib
 from datetime import date
 import bleach
 import requests
+from werkzeug.security import generate_password_hash, check_password_hash
+from sqlalchemy.orm import relationship
+from flask_login import UserMixin, login_user, LoginManager, login_required, current_user, logout_user
+from forms import CreatePostForm
+from flask_gravatar import Gravatar
+
 
 # posts = requests.get("https://api.npoint.io/8374634deab5c155b147").json()
 OWN_EMAIL = 'ya.hachu.pitci@mail.ru'
@@ -27,6 +33,7 @@ db = SQLAlchemy(app)
 
 # CONFIGURE TABLE
 class BlogPost(db.Model):
+    __tablename__ = "blog_posts"
     id = db.Column(db.Integer, primary_key=True)
     title = db.Column(db.String(250), unique=True, nullable=False)
     subtitle = db.Column(db.String(250), nullable=False)
@@ -34,6 +41,9 @@ class BlogPost(db.Model):
     body = db.Column(db.Text, nullable=False)
     author = db.Column(db.String(250), nullable=False)
     img_url = db.Column(db.String(250), nullable=False)
+
+
+db.create_all()
 
 
 class CreatePostForm(FlaskForm):
@@ -70,8 +80,23 @@ class CreatePostForm(FlaskForm):
 
 @app.route('/')
 def get_all_posts():
-    posts = db.session.query(BlogPost).all()
+    posts = BlogPost.query.all()
     return render_template("index.html", all_posts=posts)
+
+
+@app.route('/register')
+def register():
+    return render_template("register.html")
+
+
+@app.route('/login')
+def login():
+    return render_template("login.html")
+
+
+@app.route('/logout')
+def logout():
+    return redirect(url_for('get_all_posts'))
 
 
 @app.route("/about")
@@ -79,13 +104,9 @@ def about():
     return render_template("about.html")
 
 
-@app.route("/post/<int:index>")
-def show_post(index):
-    posts = db.session.query(BlogPost).all()
-    requested_post = None
-    for blog_post in posts:
-        if int(blog_post.id) == index:
-            requested_post = blog_post
+@app.route("/post/<int:post_id>")
+def show_post(post_id):
+    requested_post = BlogPost.query.get(post_id)
     return render_template("post.html", post=requested_post)
 
 
@@ -110,7 +131,6 @@ def send_email(name, email, phone, message):
 def add_new_post():
     form = CreatePostForm()
     if form.validate_on_submit():
-        x = form.body.data
         new_post = BlogPost(
             title=form.title.data,
             subtitle=form.subtitle.data,
@@ -125,7 +145,7 @@ def add_new_post():
     return render_template("make-post.html", form=form)
 
 
-@app.route("/edit-post/<post_id>", methods=["GET", "POST"])
+@app.route("/edit-post/<int:post_id>")
 def edit_post(post_id):
     post = BlogPost.query.get(post_id)
     edit_form = CreatePostForm(
@@ -143,7 +163,7 @@ def edit_post(post_id):
         post.body = edit_form.body.data
         db.session.commit()
         return redirect(url_for("show_post", post_id=post.id))
-    return render_template("make-post.html", form=edit_form, is_edit=True)
+    return render_template("make-post.html", form=edit_form)
 
 
 @app.route("/delete/<int:post_id>")
