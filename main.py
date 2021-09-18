@@ -12,7 +12,7 @@ import requests
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy.orm import relationship
 from flask_login import UserMixin, login_user, LoginManager, login_required, current_user, logout_user
-from forms import CreatePostForm
+from forms import CreatePostForm, RegisterForm
 from flask_gravatar import Gravatar
 
 
@@ -26,7 +26,7 @@ ckeditor = CKEditor(app)
 Bootstrap(app)
 
 # CONNECT TO DB
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///posts.db'
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///blog.db'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
@@ -46,15 +46,25 @@ class BlogPost(db.Model):
 db.create_all()
 
 
-class CreatePostForm(FlaskForm):
-    title = StringField(u"Blog Post Title", validators=[DataRequired()])
-    subtitle = StringField(u"Subtitle", validators=[DataRequired()])
-    author = StringField(u"Your Name", validators=[DataRequired()])
-    img_url = StringField("Blog Image URL", validators=[DataRequired(), URL()])
+class User(UserMixin, db.Model):
+    __tablename__ = "users"
+    id = db.Column(db.Integer, primary_key=True)
+    email = db.Column(db.String(100), unique=True)
+    password = db.Column(db.String(100))
+    name = db.Column(db.String(100))
 
-    # Notice body's StringField changed to CKEditorField
-    body = CKEditorField("Blog Content", validators=[DataRequired()])
-    submit = SubmitField("Submit Post")
+
+db.create_all()
+
+# class CreatePostForm(FlaskForm):
+#     title = StringField(u"Blog Post Title", validators=[DataRequired()])
+#     subtitle = StringField(u"Subtitle", validators=[DataRequired()])
+#     author = StringField(u"Your Name", validators=[DataRequired()])
+#     img_url = StringField("Blog Image URL", validators=[DataRequired(), URL()])
+#
+#     # Notice body's StringField changed to CKEditorField
+#     body = CKEditorField("Blog Content", validators=[DataRequired()])
+#     submit = SubmitField("Submit Post")
 
 
 # ## strips invalid tags/attributes
@@ -84,9 +94,26 @@ def get_all_posts():
     return render_template("index.html", all_posts=posts)
 
 
-@app.route('/register')
+@app.route('/register', methods=["GET", "POST"])
 def register():
-    return render_template("register.html")
+    form = RegisterForm()
+    if form.validate_on_submit():
+        hash_and_salted_password = generate_password_hash(
+            form.password.data,
+            method='pbkdf2:sha256',
+            salt_length=8
+        )
+        new_user = User(
+            email=form.email.data,
+            name=form.name.data,
+            password=hash_and_salted_password,
+        )
+        db.session.add(new_user)
+        db.session.commit()
+
+        return redirect(url_for("get_all_posts"))
+
+    return render_template("register.html", form=form)
 
 
 @app.route('/login')
@@ -173,9 +200,6 @@ def delete_post(post_id):
     db.session.commit()
     return redirect(url_for('get_all_posts'))
 
-
-print(4)
-print('sdgfg')
 
 if __name__ == "__main__":
     app.run(debug=True, port=5000)
