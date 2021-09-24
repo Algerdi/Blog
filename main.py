@@ -1,7 +1,6 @@
 from flask import Flask, render_template, redirect, url_for, request, flash
 from flask_bootstrap import Bootstrap
 from flask_sqlalchemy import SQLAlchemy
-from flask_wtf import FlaskForm
 from wtforms import StringField, SubmitField
 from wtforms.validators import DataRequired, URL
 from flask_ckeditor import CKEditor, CKEditorField
@@ -12,7 +11,7 @@ import requests
 from werkzeug.security import generate_password_hash, check_password_hash
 from sqlalchemy.orm import relationship
 from flask_login import UserMixin, login_user, LoginManager, login_required, current_user, logout_user
-from forms import CreatePostForm, RegisterForm, LoginForm
+from forms import CreatePostForm, RegisterForm, LoginForm, CommentForm
 from flask_gravatar import Gravatar
 from functools import wraps
 from flask import abort
@@ -22,6 +21,8 @@ from flask import abort
 OWN_EMAIL = 'ya.hachu.pitci@mail.ru'
 OWN_PASSWORD = 'saskevmaske'
 
+
+# Starting Flask application
 app = Flask(__name__)
 app.config['SECRET_KEY'] = '8BYkEfBA6O6donzWlSihBXox7C0sKR6b'
 ckeditor = CKEditor(app)
@@ -33,6 +34,7 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 
+# Adding Flask-Login
 login_manager = LoginManager()
 login_manager.init_app(app)
 
@@ -41,6 +43,7 @@ def load_user(user_id):
     return User.query.get(int(user_id))
 
 
+# DB with Users
 class User(UserMixin, db.Model):
     __tablename__ = "users"
     id = db.Column(db.Integer, primary_key=True)
@@ -50,8 +53,10 @@ class User(UserMixin, db.Model):
 
     posts = relationship("BlogPost", back_populates="author")
 
+    comments = relationship("Comment", back_populates="comment_author")
 
-# CONFIGURE TABLE
+
+# DB with User posts
 class BlogPost(db.Model):
     __tablename__ = "blog_posts"
     id = db.Column(db.Integer, primary_key=True)
@@ -65,9 +70,19 @@ class BlogPost(db.Model):
     body = db.Column(db.Text, nullable=False)
     img_url = db.Column(db.String(250), nullable=False)
 
+
+class Comment(db.Model):
+    __tablename__ = "comments"
+    id = db.Column(db.Integer, primary_key=True)
+    text = db.Column(db.Text, nullable=False)
+    author_id = db.Column(db.Integer, db.ForeignKey("users.id"))
+    comment_author = relationship("User", back_populates="comments")
+
+
 db.create_all()
 
 
+# Decorator for admin access
 def admin_only(f):
     @wraps(f)
     def decorated_function(*args, **kwargs):
@@ -178,8 +193,9 @@ def about():
 
 @app.route("/post/<int:post_id>")
 def show_post(post_id):
+    comment_form = CommentForm()
     requested_post = BlogPost.query.get(post_id)
-    return render_template("post.html", post=requested_post, current_user=current_user)
+    return render_template("post.html", post=requested_post, current_user=current_user, form=comment_form)
 
 
 @app.route("/contact", methods=["GET", "POST"])
