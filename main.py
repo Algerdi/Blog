@@ -18,8 +18,8 @@ from flask import abort
 
 
 # posts = requests.get("https://api.npoint.io/8374634deab5c155b147").json()
-OWN_EMAIL = 'ya.hachu.pitci@mail.ru'
-OWN_PASSWORD = 'saskevmaske'
+OWN_EMAIL = 'YOURS_EMAIL'
+OWN_PASSWORD = 'YOURS_PASSWORD'
 
 
 # Starting Flask application
